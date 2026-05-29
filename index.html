@@ -1,10 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Simple Page</title>
+    <title>Redirect</title>
 </head>
 <body>
-    <h1>Hello World</h1>
-    <p>This is a simple HTML example.</p>
+    <script>
+        const mappings = {
+            "fm56": "https://example.com"
+        };
+
+        const path = window.location.pathname.substring(1);
+        if (mappings[path]) {
+            window.location.href = mappings[path];
+        } else {
+            document.body.innerHTML = "<h1>Invalid code</h1>";
+        }
+    </script>
 </body>
 </html>
