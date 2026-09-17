@@ -1,0 +1,23 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: "37 15 * * 0"
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ping Supabase
+        run: |
+          URL=$(jq -r '.url' SUPABASE.json)
+          KEY=$(jq -r '.key' SUPABASE.json)
+
+          curl -sS \
+            "$URL/rest/v1/RedirectLinks?slug=eq.Tetris&select=url&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY"
