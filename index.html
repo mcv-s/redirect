@@ -108,6 +108,9 @@
 <script>
     const basePath = "/redirect/";
 
+    const RATE_LIMIT_MS = 60 * 1000;
+    const RATE_LIMIT_KEY = "redirect_last_created";
+
     let supabase = null;
 
 
@@ -145,6 +148,43 @@
     function showMainPage() {
         loading.hidden = true;
         main.hidden = false;
+    }
+
+
+    function getRateLimitRemaining() {
+        const lastCreated =
+            Number(
+                localStorage.getItem(
+                    RATE_LIMIT_KEY
+                )
+            );
+
+        if (!lastCreated) {
+            return 0;
+        }
+
+        const remaining =
+            RATE_LIMIT_MS -
+            (Date.now() - lastCreated);
+
+        return Math.max(
+            0,
+            remaining
+        );
+    }
+
+
+    function formatTime(milliseconds) {
+        const seconds =
+            Math.ceil(
+                milliseconds / 1000
+            );
+
+        if (seconds === 1) {
+            return "1 second";
+        }
+
+        return `${seconds} seconds`;
     }
 
 
@@ -281,6 +321,24 @@
                     "none";
 
 
+                /*
+                 * Client-side rate limit.
+                 */
+                const remaining =
+                    getRateLimitRemaining();
+
+
+                if (remaining > 0) {
+                    errorElement.textContent =
+                        `Please wait ${formatTime(remaining)} before creating another redirect.`;
+
+                    errorElement.style.display =
+                        "block";
+
+                    return;
+                }
+
+
                 const destination =
                     urlInput.value.trim();
 
@@ -394,6 +452,16 @@
                             `Supabase request failed: ${response.status}`
                         );
                     }
+
+
+                    /*
+                     * Only start the rate limit after
+                     * a redirect was successfully created.
+                     */
+                    localStorage.setItem(
+                        RATE_LIMIT_KEY,
+                        Date.now().toString()
+                    );
 
 
                     const link =
