@@ -11,7 +11,14 @@
 
 <body>
 
-<main id="main">
+<!-- Shown while checking whether this is a redirect -->
+<div id="loading">
+    <p>Loading . . .</p>
+</div>
+
+
+<!-- Main page -->
+<main id="main" hidden>
 
     <header>
         <h1>Redirect</h1>
@@ -76,18 +83,18 @@
         <h2>How it works</h2>
 
         <p>
-            Redirect lets you create short, memorable links that point
-            somewhere else.
+            Redirect lets you create short, memorable links
+            that point somewhere else.
         </p>
 
         <p>
-            Your redirect code becomes part of the URL. You can use a
-            custom code or generate a random one.
+            Your redirect code becomes part of the URL.
+            You can use a custom code or generate a random one.
         </p>
 
         <p>
-            The destination can be changed later without changing the
-            redirect link itself.
+            The destination can be changed later without
+            changing the redirect link itself.
         </p>
     </section>
 
@@ -97,30 +104,18 @@
 
 </main>
 
+
 <script>
     const basePath = "/redirect/";
 
     let supabase = null;
 
-    const main = document.getElementById("main");
 
-    const urlInput = document.getElementById("url");
-    const slugInput = document.getElementById("slug");
+    const loading =
+        document.getElementById("loading");
 
-    const randomButton =
-        document.getElementById("randomButton");
-
-    const createButton =
-        document.getElementById("createButton");
-
-    const errorElement =
-        document.getElementById("error");
-
-    const resultElement =
-        document.getElementById("result");
-
-    const resultLink =
-        document.getElementById("resultLink");
+    const main =
+        document.getElementById("main");
 
 
     async function loadSupabase() {
@@ -147,28 +142,33 @@
     }
 
 
-    function showRedirecting() {
-        main.innerHTML = `
-            <div class="redirecting">
-                <p>Redirecting...</p>
-            </div>
-        `;
+    function showMainPage() {
+        loading.hidden = true;
+        main.hidden = false;
     }
 
 
     async function redirectFromHash() {
-        let slug = window.location.hash.substring(1);
+        const hash =
+            window.location.hash.substring(1);
 
-        if (!slug) {
-            return false;
+
+        /*
+         * No hash means this is the normal homepage.
+         */
+        if (!hash) {
+            showMainPage();
+            return;
         }
 
-        showRedirecting();
 
         try {
-            slug = decodeURIComponent(slug);
+            const slug =
+                decodeURIComponent(hash);
 
-            const config = await loadSupabase();
+            const config =
+                await loadSupabase();
+
 
             const response = await fetch(
                 `${config.url}/rest/v1/RedirectLinks` +
@@ -183,43 +183,41 @@
                 }
             );
 
+
             if (!response.ok) {
                 throw new Error(
                     `Supabase request failed: ${response.status}`
                 );
             }
 
-            const rows = await response.json();
+
+            const rows =
+                await response.json();
+
 
             if (!rows.length || !rows[0].url) {
-                main.innerHTML = `
-                    <header>
-                        <h1>Invalid redirect</h1>
-                        <p>No redirect exists for "${slug}".</p>
-                    </header>
+                loading.innerHTML = `
+                    <p>Invalid redirect.</p>
                 `;
 
-                return true;
+                return;
             }
 
-            window.location.replace(rows[0].url);
 
-            return true;
+            loading.innerHTML = `
+                <p>Redirecting...</p>
+            `;
+
+            window.location.replace(
+                rows[0].url
+            );
 
         } catch (error) {
             console.error(error);
 
-            main.innerHTML = `
-                <header>
-                    <h1>Redirect failed</h1>
-                    <p>
-                        Something went wrong while looking up
-                        this redirect.
-                    </p>
-                </header>
+            loading.innerHTML = `
+                <p>Redirect failed.</p>
             `;
-
-            return true;
         }
     }
 
@@ -238,148 +236,205 @@
             ];
         }
 
-        slugInput.value = slug;
+        document.getElementById("slug").value =
+            slug;
     }
 
 
-    function showError(message) {
-        errorElement.textContent = message;
-        errorElement.style.display = "block";
-    }
+    function setupMainPage() {
+        const urlInput =
+            document.getElementById("url");
+
+        const slugInput =
+            document.getElementById("slug");
+
+        const randomButton =
+            document.getElementById("randomButton");
+
+        const createButton =
+            document.getElementById("createButton");
+
+        const errorElement =
+            document.getElementById("error");
+
+        const resultElement =
+            document.getElementById("result");
+
+        const resultLink =
+            document.getElementById("resultLink");
 
 
-    function clearMessages() {
-        errorElement.style.display = "none";
-        resultElement.style.display = "none";
-    }
+        randomButton.addEventListener(
+            "click",
+            generateSlug
+        );
 
 
-    async function createRedirect() {
-        clearMessages();
+        createButton.addEventListener(
+            "click",
+            async () => {
 
-        const destination =
-            urlInput.value.trim();
+                errorElement.style.display =
+                    "none";
 
-        const slug =
-            slugInput.value.trim();
+                resultElement.style.display =
+                    "none";
 
-        if (!destination) {
-            showError("Enter a destination URL.");
-            return;
-        }
 
-        try {
-            new URL(destination);
-        } catch {
-            showError("Enter a valid URL.");
-            return;
-        }
+                const destination =
+                    urlInput.value.trim();
 
-        if (!slug) {
-            showError(
-                "Enter a redirect code or generate one."
-            );
+                const slug =
+                    slugInput.value.trim();
 
-            return;
-        }
 
-        if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
-            showError(
-                "Redirect codes can only contain letters, numbers, hyphens, and underscores."
-            );
+                if (!destination) {
+                    errorElement.textContent =
+                        "Enter a destination URL.";
 
-            return;
-        }
+                    errorElement.style.display =
+                        "block";
 
-        createButton.disabled = true;
-        createButton.textContent = "Creating...";
-
-        try {
-            const config =
-                await loadSupabase();
-
-            const response = await fetch(
-                `${config.url}/rest/v1/RedirectLinks`,
-                {
-                    method: "POST",
-
-                    headers: {
-                        "apikey": config.key,
-                        "Authorization": `Bearer ${config.key}`,
-                        "Content-Type": "application/json",
-                        "Prefer": "return=representation"
-                    },
-
-                    body: JSON.stringify({
-                        slug: slug,
-                        url: destination
-                    })
+                    return;
                 }
-            );
 
-            if (!response.ok) {
-                let details = "";
 
                 try {
-                    const data =
-                        await response.json();
+                    new URL(destination);
 
-                    details =
-                        data.message ||
-                        data.hint ||
-                        "";
+                } catch {
+                    errorElement.textContent =
+                        "Enter a valid URL.";
 
-                } catch {}
+                    errorElement.style.display =
+                        "block";
 
-                if (response.status === 409) {
-                    throw new Error(
-                        "That redirect code already exists."
-                    );
+                    return;
                 }
 
-                throw new Error(
-                    details ||
-                    `Supabase request failed: ${response.status}`
-                );
+
+                if (!slug) {
+                    errorElement.textContent =
+                        "Enter a redirect code or generate one.";
+
+                    errorElement.style.display =
+                        "block";
+
+                    return;
+                }
+
+
+                if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+                    errorElement.textContent =
+                        "Redirect codes can only contain letters, numbers, hyphens, and underscores.";
+
+                    errorElement.style.display =
+                        "block";
+
+                    return;
+                }
+
+
+                createButton.disabled =
+                    true;
+
+                createButton.textContent =
+                    "Creating...";
+
+
+                try {
+                    const config =
+                        await loadSupabase();
+
+
+                    const response = await fetch(
+                        `${config.url}/rest/v1/RedirectLinks`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "apikey": config.key,
+                                "Authorization": `Bearer ${config.key}`,
+                                "Content-Type": "application/json",
+                                "Prefer": "return=representation"
+                            },
+
+                            body: JSON.stringify({
+                                slug: slug,
+                                url: destination
+                            })
+                        }
+                    );
+
+
+                    if (!response.ok) {
+                        let details = "";
+
+                        try {
+                            const data =
+                                await response.json();
+
+                            details =
+                                data.message ||
+                                data.hint ||
+                                "";
+
+                        } catch {}
+
+
+                        if (response.status === 409) {
+                            throw new Error(
+                                "That redirect code already exists."
+                            );
+                        }
+
+
+                        throw new Error(
+                            details ||
+                            `Supabase request failed: ${response.status}`
+                        );
+                    }
+
+
+                    const link =
+                        `${window.location.origin}` +
+                        `${basePath}${encodeURIComponent(slug)}`;
+
+
+                    resultLink.href =
+                        link;
+
+                    resultLink.textContent =
+                        link;
+
+                    resultElement.style.display =
+                        "block";
+
+
+                } catch (error) {
+                    console.error(error);
+
+                    errorElement.textContent =
+                        error.message ||
+                        "Failed to create redirect.";
+
+                    errorElement.style.display =
+                        "block";
+
+
+                } finally {
+                    createButton.disabled =
+                        false;
+
+                    createButton.textContent =
+                        "Create redirect";
+                }
             }
-
-            const link =
-                `${window.location.origin}` +
-                `${basePath}${encodeURIComponent(slug)}`;
-
-            resultLink.href = link;
-            resultLink.textContent = link;
-
-            resultElement.style.display =
-                "block";
-
-        } catch (error) {
-            console.error(error);
-
-            showError(
-                error.message ||
-                "Failed to create redirect."
-            );
-
-        } finally {
-            createButton.disabled = false;
-            createButton.textContent =
-                "Create redirect";
-        }
+        );
     }
 
 
-    randomButton.addEventListener(
-        "click",
-        generateSlug
-    );
-
-    createButton.addEventListener(
-        "click",
-        createRedirect
-    );
-
-
+    setupMainPage();
     redirectFromHash();
 </script>
 
