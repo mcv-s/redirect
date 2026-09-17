@@ -13,12 +13,19 @@
             display: grid;
             place-items: center;
             font-family: system-ui, sans-serif;
-            background: #111;
-            color: #fff;
+            background: #fff;
+            color: #111;
         }
-
+    
         p {
             opacity: 0.6;
+        }
+    
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #111;
+                color: #fff;
+            }
         }
     </style>
 </head>
