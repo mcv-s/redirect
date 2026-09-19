@@ -1,511 +1,503 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Redirect</title>
 
+    <link rel="stylesheet" href="colorTheme.css">
     <link rel="stylesheet" href="styles.css">
+
     <link rel="icon" href="favicon.svg">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+
 </head>
 
 <body>
 
-<!-- Shown while checking whether this is a redirect -->
-<div id="loading">
-    <p>Loading . . .</p>
-</div>
+    <!-- Shown while checking whether this is a redirect -->
+    <div id="loading">
+        <p>Loading . . .</p>
+    </div>
 
 
-<!-- Main page -->
-<main id="main" hidden>
+    <!-- Main page -->
+    <main id="main" hidden>
 
-    <header>
-        <h1>Redirect</h1>
-        <p>Create a simple, reusable link to any URL.</p>
-    </header>
+        <header>
+            <h1>Redirect</h1>
+            <p>Create a simple, reusable link to any URL.</p>
+        </header>
 
-    <section class="card">
+        <section class="card">
 
-        <div class="field">
-            <label for="url">Destination URL</label>
+            <div class="field">
+                <label for="url">Destination URL</label>
 
-            <input
-                id="url"
-                type="url"
-                placeholder="https://example.com"
-                autocomplete="off"
-                required
-            >
-        </div>
-
-        <div class="field">
-            <label for="slug">Redirect code</label>
-
-            <div class="slug-row">
-                <input
-                    id="slug"
-                    type="text"
-                    placeholder="my-link"
-                    autocomplete="off"
-                    maxlength="80"
-                    spellcheck="false"
-                >
-
-                <button
-                    type="button"
-                    class="random-button"
-                    id="randomButton"
-                >
-                    Random
-                </button>
+                <input id="url" type="url" placeholder="https://example.com" autocomplete="off" required>
             </div>
-        </div>
 
-        <button
-            type="button"
-            class="create-button"
-            id="createButton"
-        >
-            Create redirect
-        </button>
+            <div class="field">
+                <label for="slug">Redirect code</label>
 
-        <div id="error"></div>
+                <div class="slug-row">
+                    <input id="slug" type="text" placeholder="my-link" autocomplete="off" maxlength="80"
+                        spellcheck="false">
 
-        <div id="result">
-            <strong>Your redirect:</strong><br>
-            <a id="resultLink" href=""></a>
-        </div>
+                    <button type="button" class="random-button" id="randomButton">
+                        Random
+                    </button>
+                </div>
+            </div>
 
-    </section>
+            <button type="button" class="create-button" id="createButton">
+                Create redirect
+            </button>
 
-    <section class="info">
-        <h2>How it works</h2>
+            <div id="error"></div>
 
-        <p>
-            Redirect lets you create short, memorable links
-            that point somewhere else.
-        </p>
+            <div id="result">
+                <strong>Your redirect:</strong><br>
+                <a id="resultLink" href=""></a>
+            </div>
 
-        <p>
-            Your redirect code becomes part of the URL.
-            You can use a custom code or generate a random one.
-        </p>
+        </section>
 
-        <p>
-            The destination can be changed later without
-            changing the redirect link itself.
-        </p>
-    </section>
+        <section class="info">
+            <h2>How it works</h2>
 
-    <footer>
-        Simple links. No account required.
-    </footer>
+            <p>
+                Redirect lets you create short, memorable links
+                that point somewhere else.
+            </p>
 
-</main>
+            <p>
+                Your redirect code becomes part of the URL.
+                You can use a custom code or generate a random one.
+            </p>
 
+            <p>
+                The destination can be changed later without
+                changing the redirect link itself.
+            </p>
+        </section>
 
-<script>
-    const basePath = "/redirect/";
+        <footer>
+            Simple links. No account required.
+        </footer>
 
-    const RATE_LIMIT_MS = 60 * 1000;
-    const RATE_LIMIT_KEY = "redirect_last_created";
-
-    let supabase = null;
-
-
-    const loading =
-        document.getElementById("loading");
-
-    const main =
-        document.getElementById("main");
+    </main>
 
 
-    async function loadSupabase() {
-        if (supabase) {
-            return supabase;
-        }
+    <script>
+        const basePath = "/redirect/";
 
-        const response = await fetch(
-            `${basePath}SUPABASE.json`,
-            {
-                cache: "no-store"
+        const RATE_LIMIT_MS = 60 * 1000;
+        const RATE_LIMIT_KEY = "redirect_last_created";
+
+        let supabase = null;
+
+
+        const loading =
+            document.getElementById("loading");
+
+        const main =
+            document.getElementById("main");
+
+
+        async function loadSupabase() {
+            if (supabase) {
+                return supabase;
             }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                `SUPABASE.json returned ${response.status}`
-            );
-        }
-
-        supabase = await response.json();
-
-        return supabase;
-    }
-
-
-    function showMainPage() {
-        loading.hidden = true;
-        main.hidden = false;
-    }
-
-
-    function getRateLimitRemaining() {
-        const lastCreated =
-            Number(
-                localStorage.getItem(
-                    RATE_LIMIT_KEY
-                )
-            );
-
-        if (!lastCreated) {
-            return 0;
-        }
-
-        const remaining =
-            RATE_LIMIT_MS -
-            (Date.now() - lastCreated);
-
-        return Math.max(
-            0,
-            remaining
-        );
-    }
-
-
-    function formatTime(milliseconds) {
-        const seconds =
-            Math.ceil(
-                milliseconds / 1000
-            );
-
-        if (seconds === 1) {
-            return "1 second";
-        }
-
-        return `${seconds} seconds`;
-    }
-
-
-    async function redirectFromHash() {
-        const hash =
-            window.location.hash.substring(1);
-
-
-        /*
-         * No hash means this is the normal homepage.
-         */
-        if (!hash) {
-            showMainPage();
-            return;
-        }
-
-
-        try {
-            const slug =
-                decodeURIComponent(hash);
-
-            const config =
-                await loadSupabase();
-
 
             const response = await fetch(
-                `${config.url}/rest/v1/RedirectLinks` +
-                `?slug=eq.${encodeURIComponent(slug)}` +
-                `&select=url` +
-                `&limit=1`,
+                `${basePath}SUPABASE.json`,
                 {
-                    headers: {
-                        "apikey": config.key,
-                        "Authorization": `Bearer ${config.key}`
-                    }
+                    cache: "no-store"
                 }
             );
 
-
             if (!response.ok) {
                 throw new Error(
-                    `Supabase request failed: ${response.status}`
+                    `SUPABASE.json returned ${response.status}`
                 );
             }
 
+            supabase = await response.json();
 
-            const rows =
-                await response.json();
+            return supabase;
+        }
 
 
-            if (!rows.length || !rows[0].url) {
-                loading.innerHTML = `
-                    <p>Invalid redirect.</p>
-                `;
+        function showMainPage() {
+            loading.hidden = true;
+            main.hidden = false;
+        }
 
+
+        function getRateLimitRemaining() {
+            const lastCreated =
+                Number(
+                    localStorage.getItem(
+                        RATE_LIMIT_KEY
+                    )
+                );
+
+            if (!lastCreated) {
+                return 0;
+            }
+
+            const remaining =
+                RATE_LIMIT_MS -
+                (Date.now() - lastCreated);
+
+            return Math.max(
+                0,
+                remaining
+            );
+        }
+
+
+        function formatTime(milliseconds) {
+            const seconds =
+                Math.ceil(
+                    milliseconds / 1000
+                );
+
+            if (seconds === 1) {
+                return "1 second";
+            }
+
+            return `${seconds} seconds`;
+        }
+
+
+        async function redirectFromHash() {
+            const hash =
+                window.location.hash.substring(1);
+
+
+            /*
+             * No hash means this is the normal homepage.
+             */
+            if (!hash) {
+                showMainPage();
                 return;
             }
 
 
-            loading.innerHTML = `
+            try {
+                const slug =
+                    decodeURIComponent(hash);
+
+                const config =
+                    await loadSupabase();
+
+
+                const response = await fetch(
+                    `${config.url}/rest/v1/RedirectLinks` +
+                    `?slug=eq.${encodeURIComponent(slug)}` +
+                    `&select=url` +
+                    `&limit=1`,
+                    {
+                        headers: {
+                            "apikey": config.key,
+                            "Authorization": `Bearer ${config.key}`
+                        }
+                    }
+                );
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Supabase request failed: ${response.status}`
+                    );
+                }
+
+
+                const rows =
+                    await response.json();
+
+
+                if (!rows.length || !rows[0].url) {
+                    loading.innerHTML = `
+                    <p>Invalid redirect.</p>
+                `;
+
+                    return;
+                }
+
+
+                loading.innerHTML = `
                 <p>Redirecting...</p>
             `;
 
-            window.location.replace(
-                rows[0].url
-            );
+                window.location.replace(
+                    rows[0].url
+                );
 
-        } catch (error) {
-            console.error(error);
+            } catch (error) {
+                console.error(error);
 
-            loading.innerHTML = `
+                loading.innerHTML = `
                 <p>Redirect failed.</p>
             `;
-        }
-    }
-
-
-    function generateSlug() {
-        const characters =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-        let slug = "";
-
-        for (let i = 0; i < 8; i++) {
-            slug += characters[
-                Math.floor(
-                    Math.random() * characters.length
-                )
-            ];
+            }
         }
 
-        document.getElementById("slug").value =
-            slug;
-    }
+
+        function generateSlug() {
+            const characters =
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+            let slug = "";
+
+            for (let i = 0; i < 8; i++) {
+                slug += characters[
+                    Math.floor(
+                        Math.random() * characters.length
+                    )
+                ];
+            }
+
+            document.getElementById("slug").value =
+                slug;
+        }
 
 
-    function setupMainPage() {
-        const urlInput =
-            document.getElementById("url");
+        function setupMainPage() {
+            const urlInput =
+                document.getElementById("url");
 
-        const slugInput =
-            document.getElementById("slug");
+            const slugInput =
+                document.getElementById("slug");
 
-        const randomButton =
-            document.getElementById("randomButton");
+            const randomButton =
+                document.getElementById("randomButton");
 
-        const createButton =
-            document.getElementById("createButton");
+            const createButton =
+                document.getElementById("createButton");
 
-        const errorElement =
-            document.getElementById("error");
+            const errorElement =
+                document.getElementById("error");
 
-        const resultElement =
-            document.getElementById("result");
+            const resultElement =
+                document.getElementById("result");
 
-        const resultLink =
-            document.getElementById("resultLink");
-
-
-        randomButton.addEventListener(
-            "click",
-            generateSlug
-        );
+            const resultLink =
+                document.getElementById("resultLink");
 
 
-        createButton.addEventListener(
-            "click",
-            async () => {
-
-                errorElement.style.display =
-                    "none";
-
-                resultElement.style.display =
-                    "none";
+            randomButton.addEventListener(
+                "click",
+                generateSlug
+            );
 
 
-                /*
-                 * Client-side rate limit.
-                 */
-                const remaining =
-                    getRateLimitRemaining();
-
-
-                if (remaining > 0) {
-                    errorElement.textContent =
-                        `Please wait ${formatTime(remaining)} before creating another redirect.`;
+            createButton.addEventListener(
+                "click",
+                async () => {
 
                     errorElement.style.display =
-                        "block";
+                        "none";
 
-                    return;
-                }
-
-
-                const destination =
-                    urlInput.value.trim();
-
-                const slug =
-                    slugInput.value.trim();
+                    resultElement.style.display =
+                        "none";
 
 
-                if (!destination) {
-                    errorElement.textContent =
-                        "Enter a destination URL.";
-
-                    errorElement.style.display =
-                        "block";
-
-                    return;
-                }
+                    /*
+                     * Client-side rate limit.
+                     */
+                    const remaining =
+                        getRateLimitRemaining();
 
 
-                try {
-                    new URL(destination);
+                    if (remaining > 0) {
+                        errorElement.textContent =
+                            `Please wait ${formatTime(remaining)} before creating another redirect.`;
 
-                } catch {
-                    errorElement.textContent =
-                        "Enter a valid URL.";
+                        errorElement.style.display =
+                            "block";
 
-                    errorElement.style.display =
-                        "block";
-
-                    return;
-                }
+                        return;
+                    }
 
 
-                if (!slug) {
-                    errorElement.textContent =
-                        "Enter a redirect code or generate one.";
+                    const destination =
+                        urlInput.value.trim();
 
-                    errorElement.style.display =
-                        "block";
-
-                    return;
-                }
+                    const slug =
+                        slugInput.value.trim();
 
 
-                if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
-                    errorElement.textContent =
-                        "Redirect codes can only contain letters, numbers, hyphens, and underscores.";
+                    if (!destination) {
+                        errorElement.textContent =
+                            "Enter a destination URL.";
 
-                    errorElement.style.display =
-                        "block";
+                        errorElement.style.display =
+                            "block";
 
-                    return;
-                }
-
-
-                createButton.disabled =
-                    true;
-
-                createButton.textContent =
-                    "Creating...";
+                        return;
+                    }
 
 
-                try {
-                    const config =
-                        await loadSupabase();
+                    try {
+                        new URL(destination);
+
+                    } catch {
+                        errorElement.textContent =
+                            "Enter a valid URL.";
+
+                        errorElement.style.display =
+                            "block";
+
+                        return;
+                    }
 
 
-                    const response = await fetch(
-                        `${config.url}/rest/v1/RedirectLinks`,
-                        {
-                            method: "POST",
+                    if (!slug) {
+                        errorElement.textContent =
+                            "Enter a redirect code or generate one.";
 
-                            headers: {
-                                "apikey": config.key,
-                                "Authorization": `Bearer ${config.key}`,
-                                "Content-Type": "application/json",
-                                "Prefer": "return=representation"
-                            },
+                        errorElement.style.display =
+                            "block";
 
-                            body: JSON.stringify({
-                                slug: slug,
-                                url: destination
-                            })
-                        }
-                    );
+                        return;
+                    }
 
 
-                    if (!response.ok) {
-                        let details = "";
+                    if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+                        errorElement.textContent =
+                            "Redirect codes can only contain letters, numbers, hyphens, and underscores.";
 
-                        try {
-                            const data =
-                                await response.json();
+                        errorElement.style.display =
+                            "block";
 
-                            details =
-                                data.message ||
-                                data.hint ||
-                                "";
-
-                        } catch {}
+                        return;
+                    }
 
 
-                        if (response.status === 409) {
+                    createButton.disabled =
+                        true;
+
+                    createButton.textContent =
+                        "Creating...";
+
+
+                    try {
+                        const config =
+                            await loadSupabase();
+
+
+                        const response = await fetch(
+                            `${config.url}/rest/v1/RedirectLinks`,
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "apikey": config.key,
+                                    "Authorization": `Bearer ${config.key}`,
+                                    "Content-Type": "application/json",
+                                    "Prefer": "return=representation"
+                                },
+
+                                body: JSON.stringify({
+                                    slug: slug,
+                                    url: destination
+                                })
+                            }
+                        );
+
+
+                        if (!response.ok) {
+                            let details = "";
+
+                            try {
+                                const data =
+                                    await response.json();
+
+                                details =
+                                    data.message ||
+                                    data.hint ||
+                                    "";
+
+                            } catch { }
+
+
+                            if (response.status === 409) {
+                                throw new Error(
+                                    "That redirect code already exists."
+                                );
+                            }
+
+
                             throw new Error(
-                                "That redirect code already exists."
+                                details ||
+                                `Supabase request failed: ${response.status}`
                             );
                         }
 
 
-                        throw new Error(
-                            details ||
-                            `Supabase request failed: ${response.status}`
+                        /*
+                         * Only start the rate limit after
+                         * a redirect was successfully created.
+                         */
+                        localStorage.setItem(
+                            RATE_LIMIT_KEY,
+                            Date.now().toString()
                         );
+
+
+                        const link =
+                            `${window.location.origin}` +
+                            `${basePath}${encodeURIComponent(slug)}`;
+
+
+                        resultLink.href =
+                            link;
+
+                        resultLink.textContent =
+                            link;
+
+                        resultElement.style.display =
+                            "block";
+
+
+                    } catch (error) {
+                        console.error(error);
+
+                        errorElement.textContent =
+                            error.message ||
+                            "Failed to create redirect.";
+
+                        errorElement.style.display =
+                            "block";
+
+
+                    } finally {
+                        createButton.disabled =
+                            false;
+
+                        createButton.textContent =
+                            "Create redirect";
                     }
-
-
-                    /*
-                     * Only start the rate limit after
-                     * a redirect was successfully created.
-                     */
-                    localStorage.setItem(
-                        RATE_LIMIT_KEY,
-                        Date.now().toString()
-                    );
-
-
-                    const link =
-                        `${window.location.origin}` +
-                        `${basePath}${encodeURIComponent(slug)}`;
-
-
-                    resultLink.href =
-                        link;
-
-                    resultLink.textContent =
-                        link;
-
-                    resultElement.style.display =
-                        "block";
-
-
-                } catch (error) {
-                    console.error(error);
-
-                    errorElement.textContent =
-                        error.message ||
-                        "Failed to create redirect.";
-
-                    errorElement.style.display =
-                        "block";
-
-
-                } finally {
-                    createButton.disabled =
-                        false;
-
-                    createButton.textContent =
-                        "Create redirect";
                 }
-            }
-        );
-    }
+            );
+        }
 
 
-    setupMainPage();
-    redirectFromHash();
-</script>
+        setupMainPage();
+        redirectFromHash();
+    </script>
 
 </body>
+
+
+<script type="module" src="https://mcv-s.github.io/utils/web/themeToggleBubble.js"></script>
+
+
+
 </html>
